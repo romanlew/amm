@@ -20,10 +20,11 @@ contract DammOracle {
      * Returns the simulated orderbookpressure
      */
     function getOrderBookPressure() public view returns (uint256) {
-        uint256 bidSize = random(1, 1000);
-        console.logUint(bidSize);
-        // uint256 bidPrice = OFF_CHAIN_MID_PRICE_ETH_USDT * (1000 - HALF_SPREAD) / 1000;
+        // uint256 bidSize = random(1, 1000);
+        // console.logUint(1000 + HALF_SPREAD);
+        // // uint256 bidPrice = OFF_CHAIN_MID_PRICE_ETH_USDT * (1000 - HALF_SPREAD) / 1000;
         // uint256 askPrice = OFF_CHAIN_MID_PRICE_ETH_USDT * (1000 + HALF_SPREAD) / 1000;
+        // console.log("ASK PRICE:", askPrice);
         // uint256 askSize = random(1, 1000);
 
         // while (askSize == bidSize) {

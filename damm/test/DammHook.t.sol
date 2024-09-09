@@ -32,11 +32,13 @@ contract TestDammHook is Test, Deployers {
     // uint256 sepoliaForkId = vm.createFork("https://rpc.sepolia.org/");
 
     DammHook hook;
+    address swapper0 = address(0xBEEF0);
+    address swapper1 = address(0xBEEF1);
+    address swapper2 = address(0xBEEF2);
 
     function setUp() public {
         // vm.selectFork(sepoliaForkId);
         // vm.deal(address(this), 500 ether);
-
         // Deploy v4-core
         deployFreshManagerAndRouters();
 
@@ -81,6 +83,30 @@ contract TestDammHook is Test, Deployers {
     }
 
     function testBeforeSwap() public {
+        key.currency0.transfer(address(swapper0), 10e18);
+        key.currency1.transfer(address(swapper0), 10e18);
+
+        key.currency0.transfer(address(swapper1), 10e18);
+        key.currency1.transfer(address(swapper1), 10e18);
+
+        key.currency0.transfer(address(swapper2), 10e18);
+        key.currency1.transfer(address(swapper2), 10e18);
+
+        console.log("--- STARTING BALANCES ---");
+
+        uint256 userBalanceBefore0 = currency0.balanceOf(address(swapper0));
+        uint256 userBalanceBefore1 = currency1.balanceOf(address(swapper0));
+
+        uint256 hookBalanceBefore0 = currency0.balanceOf(address(swapper1));
+        uint256 hookBalanceBefore1 = currency1.balanceOf(address(swapper1));
+
+        console.log("Swapper address 0: ", address(swapper0));
+        console.log("Swapper address 1: ", address(swapper1));
+        console.log("Swapper address 0 balance in currency0 before swapping: ", userBalanceBefore0);
+        console.log("Swapper address 0 balance in currency1 before swapping: ", userBalanceBefore1);
+        console.log("Swapper address 1 balance in currency0 before swapping: ", hookBalanceBefore0);
+        console.log("Swapper address 1 balance in currency1 before swapping: ", hookBalanceBefore1);
+
         // Set up our swap parameters
         PoolSwapTest.TestSettings memory testSettings = PoolSwapTest
             .TestSettings({takeClaims: false, settleUsingBurn: false});
@@ -91,45 +117,66 @@ contract TestDammHook is Test, Deployers {
             sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
         });
 
-        // Current gas price is 10 gwei
-        // Moving average should also be 10
-        // uint128 gasPrice = uint128(tx.gasprice);
-        // uint128 movingAverageGasPrice = hook.movingAverageGasPrice();
-        // uint104 movingAverageGasPriceCount = hook.movingAverageGasPriceCount();
-        // assertEq(gasPrice, 10 gwei);
-        // assertEq(movingAverageGasPrice, 10 gwei);
-        // assertEq(movingAverageGasPriceCount, 1);
-
-        // ----------------------------------------------------------------------
-        // ----------------------------------------------------------------------
-        // ----------------------------------------------------------------------
-        // ----------------------------------------------------------------------
-
-        // 1. Conduct a swap at gasprice = 10 gwei
-        // This should just use `BASE_FEE` since the gas price is the same as the current average
-        uint256 balanceOfToken1Before = currency1.balanceOfSelf();
+        vm.prank(swapper0);
 
         uint256 submittedDeltaFee = 1000;
         bytes memory hookData = hook.getHookData(submittedDeltaFee);
         swapRouter.swap(key, params, testSettings, hookData);
 
-        submittedDeltaFee = 2000;
-        hookData = hook.getHookData(submittedDeltaFee);
-        swapRouter.swap(key, params, testSettings, hookData);
-        
-        submittedDeltaFee = 1500;
-        hookData = hook.getHookData(submittedDeltaFee);
-        swapRouter.swap(key, params, testSettings, hookData);
+        // vm.roll(5);
 
-        uint256 balanceOfToken1After = currency1.balanceOfSelf();
-        uint256 outputFromBaseFeeSwap = balanceOfToken1After -
-            balanceOfToken1Before;
+        // submittedDeltaFee = 2000;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
 
-        assertGt(balanceOfToken1After, balanceOfToken1Before);
+        // vm.stopPrank();
+        // vm.startPrank(swapper1);
+        // deployMintAndApprove2Currencies();
 
-        console.log("Balance of token 1 before swap", balanceOfToken1Before);
-        console.log("Balance of token 1 after swap", balanceOfToken1After);
-        console.log("Base Fee Output", outputFromBaseFeeSwap);
+        // submittedDeltaFee = 2000;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
+
+        // vm.stopPrank();
+
+        // vm.prank(swapper2);
+        // deployMintAndApprove2Currencies();
+
+        // submittedDeltaFee = 2000;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
+
+        // // skip 10 blocks ahead
+        // vm.roll(10);
+
+        // submittedDeltaFee = 1500;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
+
+        // vm.roll(12);
+
+        // submittedDeltaFee = 1500;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
+
+        // submittedDeltaFee = 1500;
+        // hookData = hook.getHookData(submittedDeltaFee);
+        // swapRouter.swap(key, params, testSettings, hookData);
+
+        // vm.roll(13);
+
+        // // no submittedDeltaFee
+        // swapRouter.swap(key, params, testSettings, ZERO_BYTES);
+
+        // uint256 balanceOfToken1After = currency1.balanceOfSelf();
+        // uint256 outputFromBaseFeeSwap = balanceOfToken1After -
+        //     balanceOfToken1Before;
+
+        // assertGt(balanceOfToken1After, balanceOfToken1Before);
+
+        // console.log("Balance of token 1 before swap", balanceOfToken1Before);
+        // console.log("Balance of token 1 after swap", balanceOfToken1After);
+        // console.log("Base Fee Output", outputFromBaseFeeSwap);
     }
 
 

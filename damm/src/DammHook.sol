@@ -10,7 +10,6 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapDelta.sol";
 
 import {DammOracle} from "../src/DammOracle.sol";
-import {DammHook} from "../src/DammHook.sol";
 import {console} from "forge-std/console.sol";
 
 
@@ -47,10 +46,16 @@ contract DammHook is BaseHook {
     error MustUseDynamicFee();
 
     //Storage for submittedDeltaFees
-    mapping(address sender => uint256 inputAmount) public submittedDeltaFees;
+    mapping(uint256 blockNumber => mapping(address sender => uint256 inputAmount)) public submittedDeltaFees;
+
+    struct Swappers {
+        address sender;
+        uint256 submittedDeltaFee;
+    }
 
     // TODO reset for a new block - maybe a Trader struct
     address[] senders;
+    uint256[2] blockNumbersStored;
 
     // struct SubmittedDeltaFees {
     //     uint256 blockNumber ;
@@ -123,9 +128,21 @@ contract DammHook is BaseHook {
                 uint24 fee = BASE_FEE;
                 uint256 offChainMidPrice = dammOracle.getOrderBookPressure();
                 
+                console.log("Current Blocknumber: ", blockNumber);
+                console.log("Current sender: ", sender);
+
+
+                _checkForNewBlockAndCleanStorage(blockNumber);
+
+                for (uint i = 0; i <= blockNumbersStored.length - 1; i++) {
+                    console.log("Blocknumbers stored: ", blockNumbersStored[i]);
+                }
+
                 _storeSubmittedDeltaFee(sender, blockNumber, hookData);
                 poolManager.updateDynamicLPFee(key, fee);
-                console.log("Blocknumber: ", blockNumber);
+
+                getSubmittedDeltaFeeForLastBlock();
+
 
 
             // if (currentBlockId == 0) {
@@ -186,6 +203,23 @@ contract DammHook is BaseHook {
             return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
+    function _checkForNewBlockAndCleanStorage(uint256 currentBlockNumber) internal {
+        if(blockNumbersStored.length == 0) return;
+
+        // no new block
+        if(blockNumbersStored[1] == currentBlockNumber) return;
+
+        if(currentBlockNumber > blockNumbersStored[1]) {
+            delete senders;
+            console.log("deleting senders");
+        }
+
+        // new block
+        if(currentBlockNumber > blockNumbersStored[0]) {
+            blockNumbersStored[0] = blockNumbersStored[1];
+            blockNumbersStored[1] = currentBlockNumber;
+        }
+    }
 
     function _storeSubmittedDeltaFee(
         address sender,
@@ -198,21 +232,23 @@ contract DammHook is BaseHook {
             hookData,
             (uint256)
         );
+
         if (submittedDeltaFee == 0) return;
 
         if (submittedDeltaFee != 0) {
             require(submittedDeltaFee >= 0, "Submitted fee must be non-negative.");
             require(submittedDeltaFee < BASE_FEE, "Submitted fee cannot exceed base fee.");
 
-            if (submittedDeltaFees[sender] != 0) {
-                uint256 oldSubmittedDeltaFee = submittedDeltaFees[sender];
+            if (submittedDeltaFees[blockNumber][sender] != 0) {
+                uint256 oldSubmittedDeltaFee = submittedDeltaFees[blockNumber][sender];
                 uint256 maxSubmittedDeltaFee = max(oldSubmittedDeltaFee, submittedDeltaFee);
-                submittedDeltaFees[sender] = maxSubmittedDeltaFee;
-                console.log("maxSubmittedDeltaFee: ", maxSubmittedDeltaFee);
+                submittedDeltaFees[blockNumber][sender] = maxSubmittedDeltaFee;
+                // console.log("maxSubmittedDeltaFee: ", maxSubmittedDeltaFee);
             } else {
                 senders.push(sender);
-                submittedDeltaFees[sender] = submittedDeltaFee;
-                console.log("submittedDeltaFee: ", submittedDeltaFee);
+                console.log("new sender:", sender);
+                submittedDeltaFees[blockNumber][sender] = submittedDeltaFee;
+                // console.log("submittedDeltaFee: ", submittedDeltaFee);
             }
 
             // TODO include intent to trade next block
@@ -270,19 +306,20 @@ contract DammHook is BaseHook {
     function getSubmittedDeltaFeesForBlockByAddress(
         address sender
     ) public view returns (uint256 submittedDeltaFee) {
-        return submittedDeltaFees[sender];
+        return submittedDeltaFees[block.number][sender];
     }
 
-    function getSubmittedDeltaFeeForBlock() public view returns (uint256) {
+    function getSubmittedDeltaFeeForLastBlock() public view returns (uint256) {
         uint256 numberSenders = senders.length;
-        if (numberSenders < 2) {
-            return BASE_FEE;
-        }
+        // if (numberSenders < 2) {
+        //     return BASE_FEE;
+        // }
 
         uint[] memory sortedDeltaFees = new uint[](numberSenders);
 
         for (uint256 i = 0; i < senders.length; i++) {
-            sortedDeltaFees[i] = submittedDeltaFees[senders[i]];
+            console.log(senders[i]);
+            sortedDeltaFees[i] = submittedDeltaFees[blockNumbersStored[0]][senders[i]];
         }
 
         sort(sortedDeltaFees);
