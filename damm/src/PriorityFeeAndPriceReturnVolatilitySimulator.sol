@@ -35,8 +35,7 @@ contract PriorityFeeAndPriceReturnVolatilitySimulator {
         return sum / data.length;
     }
 
-    function calculateStdDev(
-        uint256[] memory data, uint256 mean) internal view returns (uint256) {
+    function calculateStdDev(uint256[] memory data, uint256 mean) internal view returns (uint256) {
         uint256 variance = 0;
         for (uint256 i = 0; i < data.length; i++) {
             variance += (data[i] - mean) * (data[i] - mean);
@@ -45,8 +44,7 @@ contract PriorityFeeAndPriceReturnVolatilitySimulator {
         return sqrt(variance);
     }
 
-    function standardizeData(
-        uint256[] memory data, uint256 mean, uint256 stdDev) internal view returns (uint256[] memory) {
+    function standardizeData(uint256[] memory data, uint256 mean, uint256 stdDev) internal view returns (uint256[] memory) {
         uint256[] memory standardizedData = new uint256[](data.length);
         for (uint256 i = 0; i < data.length; i++) {
             standardizedData[i] = (data[i] - mean) * 1e18 / stdDev; // Multiply by 1e18 to maintain precision

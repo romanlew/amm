@@ -14,7 +14,7 @@ import {console} from "forge-std/console.sol";
 import {FeeQuantizer} from "../src/FeeQuantizer.sol";
 import {MevClassifier} from "../src/MevClassifier.sol";
 import {DammHookHelper} from "../src/DammHookHelper.sol";
-import {RandomNumberGenerator} from "../src/RandomNumberGenerator.sol";
+import {MathLibrary} from "../src/MathLibrary.sol";
 
 
 contract DammHook is BaseHook {
@@ -23,7 +23,6 @@ contract DammHook is BaseHook {
 	// data types 
     using BalanceDeltaLibrary for BalanceDelta;
     using LPFeeLibrary for uint24;
-    RandomNumberGenerator private randomNumberGenerator;
 
     FeeQuantizer feeQuantizer;
     MevClassifier mevClassifier;
@@ -64,16 +63,17 @@ contract DammHook is BaseHook {
         address sender;
     }
 
+    struct TransactionParams {
+        uint256 priorityFee;
+        // Add other transaction parameters as needed
+    }
+
     // Initialize BaseHook parent contract in the constructor
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {
         feeQuantizer = new FeeQuantizer();
         mevClassifier = new MevClassifier(address(feeQuantizer), 5, 1, 2);
         dammOracle = new DammOracle();
         dammHookHelper = new DammHookHelper(address(dammOracle));
-        randomNumberGenerator = new RandomNumberGenerator();
-
-        //TODO clean up
-        updateMovingAverage();
     }
 
 	// Set up hook permissions to return `true`
@@ -174,70 +174,13 @@ contract DammHook is BaseHook {
                 poolManager.updateDynamicLPFee(key, finalPoolFee);
                 // poolManager.updateDynamicLPFee(key, fee);
                 console.log("Blocknumber: ", blockNumber);
-
-
-            // if (currentBlockId == 0) {
-            //     currentBlockId = blockNumber;
-            //     beginBlock(blockNumber, efficientOffChainPrice);
-            // } else if (currentBlockId != blockId) {
-            //     endBlock();
-            //     currentBlockId = blockNumber;
-            //     beginBlock(blockNumber, efficientOffChainPrice);
-            // }
-
-            // if (currentBlockId == 0) {
-            //     poolFee = 1 + BASE_FEE;
-            // } else {
-            //     uint256 delta = calculateCombinedFee(blockNumber, sender).sub(BASE_FEE);
-            //     poolFee = poolFee.add(delta);
-            // }
-
-            // uint256 currentAMMPrice = sqrtPrice.mul(sqrtPrice);
-            // (uint256 ammBidPrice, uint256 ammAskPrice) = getBidAndAskOfAMM(currentAMMPrice);
-
-            // if (submittedFee < 0) {
-            //     revert("Submitted fee must be non-negative.");
-            // } else if (submittedFee >= BASE_FEE) {
-            //     revert("Submitted fee cannot exceed base fee.");
-            // } else {
-            //     listSubmittedFees.push(submittedFee);
-            //     previousBlockSwappers[sender] = true;
-            //     setOfIntendToTradeSwapperSignalledInPreviousBlock[sender] = true;
-            // }
-
-            // if (informedTraders[sender]) {
-            //     if (ammAskPrice > efficientOffChainPrice && ammBidPrice < efficientOffChainPrice) {
-            //         return (0, 0, 0);
-            //     }
-            // }
-
-            // uint256 x;
-            // uint256 y;
-            // uint256 fee;
-            // if (ammAskPrice < efficientOffChainPrice) {
-            //     uint256 _fee = 1 + poolFee;
-            //     uint256 newSqrtPrice = sqrt(efficientOffChainPrice.div(_fee));
-            //     (x, y, fee) = buyXTokensForYTokens(newSqrtPrice, _fee);
-            // } else if (ammBidPrice > efficientOffChainPrice) {
-            //     uint256 _fee = 1 + poolFee;
-            //     uint256 newSqrtPrice = sqrt(efficientOffChainPrice.mul(2).sub(_fee));
-            //     (x, y, fee) = sellXTokensForYTokens(newSqrtPrice, _fee);
-            // }
-
-            // if (tx.gas > x.mul(efficientOffChainPrice).add(y)) {
-            //     revert("Gas cost cannot exceed the total value of the trade.");
-            // } else {
-            //     sqrtPrice = sqrt(efficientOffChainPrice);
-            // }
-
-            // emit TokensSwapped(swapperId, x, y, fee);
             return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, finalPoolFee);
     }
 
-    function getPriorityFee(IPoolManager.SwapParams calldata params) public returns (uint256) {
+    function getPriorityFee(TransactionParams calldata params) public view returns (uint256) {
         // currently returns the priority fee as a random number
-        uint256 randomNumber = randomNumberGenerator.getRandomNumber();
-        return randomNumber;
+        uint256 minersTip = tx.gasprice - block.basefee;
+        return minersTip;
     }
 
     function _storeSubmittedDeltaFee(
@@ -274,38 +217,7 @@ contract DammHook is BaseHook {
         BalanceDelta,
         bytes calldata
     ) external override returns (bytes4, int128) {
-        updateMovingAverage();
         return (this.afterSwap.selector, 0);
-    }
-
-    // TODO OLD get fee function from sample
-    function getFee() internal view returns (uint24) {
-        uint128 gasPrice = uint128(tx.gasprice);
-
-        // if gasPrice > movingAverageGasPrice * 1.1, then half the fees
-        if (gasPrice > (movingAverageGasPrice * 11) / 10) {
-            return BASE_FEE / 2;
-        }
-
-        // if gasPrice < movingAverageGasPrice * 0.9, then double the fees
-        if (gasPrice < (movingAverageGasPrice * 9) / 10) {
-            return BASE_FEE * 2;
-        }
-
-        return BASE_FEE;
-    }
-
-    // TODO OLD moving average function from sample
-    // Update our moving average gas price
-    function updateMovingAverage() internal {
-        uint128 gasPrice = uint128(tx.gasprice);
-
-        // New Average = ((Old Average * # of Txns Tracked) + Current Gas Price) / (# of Txns Tracked + 1)
-        movingAverageGasPrice =
-            ((movingAverageGasPrice * movingAverageGasPriceCount) + gasPrice) /
-            (movingAverageGasPriceCount + 1);
-
-        movingAverageGasPriceCount++;
     }
 
     function getHookData(
@@ -340,7 +252,7 @@ contract DammHook is BaseHook {
             filteredFees[i] = sortedDeltaFees[i];
         }
         
-        uint256 sigmaFee = filteredFees.sqrt();
+        uint256 sigmaFee = calculateStdDev(filteredFees, calculateMean(filteredFees));
         uint256 calculatedDeltaFeeForBlock = N * sigmaFee;
 
         // TODO include intent to trade next block
@@ -356,6 +268,34 @@ contract DammHook is BaseHook {
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a >= b ? a : b;
+    }
+
+    function calculateStdDev(
+        uint256[] memory data, uint256 mean) internal view returns (uint256) {
+        uint256 variance = 0;
+        for (uint256 i = 0; i < data.length; i++) {
+            variance += (data[i] - mean) * (data[i] - mean);
+        }
+        variance /= data.length;
+        return sqrt(variance);
+    }
+
+    function calculateMean(uint256[] memory data) internal view returns (uint256) {
+        uint256 sum = 0;
+        for (uint256 i = 0; i < data.length; i++) {
+            sum += data[i];
+        }
+        return sum / data.length;
+    }
+
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
     }
 
     // very costly - maybe offchain calculation necessary
