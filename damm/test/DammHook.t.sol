@@ -83,29 +83,35 @@ contract TestDammHook is Test, Deployers {
     }
 
     function testBeforeSwap() public {
-        key.currency0.transfer(address(swapper0), 10e18);
-        key.currency1.transfer(address(swapper0), 10e18);
+        key.currency0.transfer(address(swapper0), 5e18);
+        key.currency1.transfer(address(swapper0), 5e18);
 
         key.currency0.transfer(address(swapper1), 10e18);
         key.currency1.transfer(address(swapper1), 10e18);
 
-        key.currency0.transfer(address(swapper2), 10e18);
-        key.currency1.transfer(address(swapper2), 10e18);
+        key.currency0.transfer(address(swapper2), 15e18);
+        key.currency1.transfer(address(swapper2), 15e18);
 
-        console.log("--- STARTING BALANCES ---");
+        console.log("testBeforeSwap | --- STARTING BALANCES ---");
 
-        uint256 userBalanceBefore0 = currency0.balanceOf(address(swapper0));
-        uint256 userBalanceBefore1 = currency1.balanceOf(address(swapper0));
+        uint256 swapper0BalanceBefore0 = currency0.balanceOf(address(swapper0));
+        uint256 swapper0BalanceBefore1 = currency1.balanceOf(address(swapper0));
 
-        uint256 hookBalanceBefore0 = currency0.balanceOf(address(swapper1));
-        uint256 hookBalanceBefore1 = currency1.balanceOf(address(swapper1));
+        uint256 swapper1BalanceBefore0 = currency0.balanceOf(address(swapper1));
+        uint256 swapper1BalanceBefore1 = currency1.balanceOf(address(swapper1));
 
-        console.log("Swapper address 0: ", address(swapper0));
-        console.log("Swapper address 1: ", address(swapper1));
-        console.log("Swapper address 0 balance in currency0 before swapping: ", userBalanceBefore0);
-        console.log("Swapper address 0 balance in currency1 before swapping: ", userBalanceBefore1);
-        console.log("Swapper address 1 balance in currency0 before swapping: ", hookBalanceBefore0);
-        console.log("Swapper address 1 balance in currency1 before swapping: ", hookBalanceBefore1);
+        uint256 swapper2BalanceBefore0 = currency0.balanceOf(address(swapper2));
+        uint256 swapper2BalanceBefore1 = currency1.balanceOf(address(swapper2));
+
+        console.log("testBeforeSwap | Swapper address 0: ", address(swapper0));
+        console.log("testBeforeSwap | Swapper address 1: ", address(swapper1));
+        console.log("testBeforeSwap | Swapper address 2: ", address(swapper2));
+        console.log("testBeforeSwap | Swapper address 0 balance in currency0 before swapping: ", swapper0BalanceBefore0);
+        console.log("testBeforeSwap | Swapper address 0 balance in currency1 before swapping: ", swapper0BalanceBefore1);
+        console.log("testBeforeSwap | Swapper address 1 balance in currency0 before swapping: ", swapper1BalanceBefore0);
+        console.log("testBeforeSwap | Swapper address 1 balance in currency1 before swapping: ", swapper1BalanceBefore1);
+        console.log("testBeforeSwap | Swapper address 2 balance in currency0 before swapping: ", swapper2BalanceBefore0);
+        console.log("testBeforeSwap | Swapper address 2 balance in currency1 before swapping: ", swapper2BalanceBefore1);
 
         // Set up our swap parameters
         PoolSwapTest.TestSettings memory testSettings = PoolSwapTest
@@ -117,11 +123,15 @@ contract TestDammHook is Test, Deployers {
             sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
         });
 
-        vm.prank(swapper0);
+        console.log("testBeforeSwap | --- START PRANK WITH ADDRESS", address(swapper0));
+        vm.startPrank(swapper0);
 
         uint256 submittedDeltaFee = 1000;
         bytes memory hookData = hook.getHookData(submittedDeltaFee);
         swapRouter.swap(key, params, testSettings, hookData);
+
+        vm.stopPrank();
+        console.log("testBeforeSwap | --- PRANK STOPPED FOR ADDRESS", address(swapper0));
 
         // vm.roll(5);
 

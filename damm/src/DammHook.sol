@@ -128,14 +128,14 @@ contract DammHook is BaseHook {
                 uint24 fee = BASE_FEE;
                 uint256 offChainMidPrice = dammOracle.getOrderBookPressure();
                 
-                console.log("Current Blocknumber: ", blockNumber);
-                console.log("Current sender: ", sender);
+                console.log("beforeSwap | Current Blocknumber: ", blockNumber);
+                console.log("beforeSwap | Current sender: ", msg.sender);
 
 
                 _checkForNewBlockAndCleanStorage(blockNumber);
 
                 for (uint i = 0; i <= blockNumbersStored.length - 1; i++) {
-                    console.log("Blocknumbers stored: ", blockNumbersStored[i]);
+                    console.log("beforeSwap | Blocknumbers stored: ", blockNumbersStored[i]);
                 }
 
                 _storeSubmittedDeltaFee(sender, blockNumber, hookData);
@@ -211,7 +211,7 @@ contract DammHook is BaseHook {
 
         if(currentBlockNumber > blockNumbersStored[1]) {
             delete senders;
-            console.log("deleting senders");
+            console.log("_checkForNewBlockAndCleanStorage | deleting senders");
         }
 
         // new block
@@ -246,7 +246,7 @@ contract DammHook is BaseHook {
                 // console.log("maxSubmittedDeltaFee: ", maxSubmittedDeltaFee);
             } else {
                 senders.push(sender);
-                console.log("new sender:", sender);
+                console.log("_storeSubmittedDeltaFee | new sender:", sender);
                 submittedDeltaFees[blockNumber][sender] = submittedDeltaFee;
                 // console.log("submittedDeltaFee: ", submittedDeltaFee);
             }
