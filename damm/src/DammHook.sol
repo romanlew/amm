@@ -64,22 +64,13 @@ contract DammHook is BaseHook {
         address sender;
     }
 
-    // struct SubmittedDeltaFees {
-    //     uint256 blockNumber ;
-    //     address submitAddress;
-    // }
-    // uint public SubmittedDeltaFeesLength = 0;
-
-    // SubmittedDeltaFees[] submittedDeltaFees;
-
-    // DammOracle dammOracle;
-
     // Initialize BaseHook parent contract in the constructor
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {
         feeQuantizer = new FeeQuantizer();
         mevClassifier = new MevClassifier(address(feeQuantizer), 5, 1, 2);
         dammOracle = new DammOracle();
         dammHookHelper = new DammHookHelper(address(dammOracle));
+        randomNumberGenerator = new RandomNumberGenerator();
 
         //TODO clean up
         updateMovingAverage();
@@ -349,7 +340,7 @@ contract DammHook is BaseHook {
             filteredFees[i] = sortedDeltaFees[i];
         }
         
-        uint256 sigmaFee = std(filteredFees);
+        uint256 sigmaFee = filteredFees.sqrt();
         uint256 calculatedDeltaFeeForBlock = N * sigmaFee;
 
         // TODO include intent to trade next block
@@ -361,12 +352,6 @@ contract DammHook is BaseHook {
         // }
 
         return calculatedDeltaFeeForBlock;
-    }
-
-    // very costly - maybe offchain calculation necessary
-    // NOTE: @Roman, can we use the the MathLibrary.sqrt() function here?
-    function std(uint256[] memory data) internal pure returns (uint256) {
-        // Implement standard deviation calculation
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
