@@ -35,9 +35,6 @@ contract DammOracle {
         return y;
     }
 
-    /**
-     * Returns the simulated orderbookpressure
-     */
     function getOrderBookPressure() public view returns (uint256) {
         uint256 bidSize = random(1, 1000);
         // console.logUint("bid size");
@@ -78,7 +75,7 @@ contract DammOracle {
                                                                uint256 priceAfterPreviousBlock) {
         // Simulate fetching two consecutive prices from Gbm
         // uint256 priceVolatility = getPriceVolatility(); 
-        uint256 priceVolatility = 0.1 / sqrt(86400/13);
+        uint256 priceVolatility = 10 / (sqrt(86400 / 15) * 10);
         uint256 basePrice = 1000; // Example base price
         // Simulate price before the previous block
         priceBeforePreviousBlock = basePrice + random(0, priceVolatility);
