@@ -54,7 +54,7 @@ contract DammOracle {
         // }
 
         // uint256 bidValue = bidSize * bidPrice;
-        // uint256 askValue = askSize * askPrice;f
+        // uint256 askValue = askSize * askPrice;
         return (askSize * askPrice - bidSize * bidPrice) / (askSize * askPrice + bidSize * bidPrice);
         // return 5000;
     }

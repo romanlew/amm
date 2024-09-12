@@ -37,9 +37,6 @@ contract DammHook is BaseHook {
     uint24 public constant BASE_FEE = 3000; // 0.3%
 
     uint24 public constant CUT_OFF_PERCENTILE = 85;
-
-    // TODO change M to 0.5 similar to BASE_FEE handling
-    uint24 public constant M = 5000;
     uint24 public constant N = 2;
 
     error MustUseDynamicFee();
