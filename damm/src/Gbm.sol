@@ -63,14 +63,14 @@ contract GeometricBrownianMotion {
         return y;
     }
 
-        function exp(int256 x) internal pure returns (uint256) {
-            // Approximate exp function using Taylor series expansion
-            uint256 sum = 1;
-            uint256 term = 1;
-            for (uint256 i = 1; i < 10; i++) {
-                term = term * uint256(x) / i;
-                sum = sum + term;
-            }
-            return sum;
+    function exp(int256 x) internal pure returns (uint256) {
+        // Approximate exp function using Taylor series expansion
+        uint256 sum = 1;
+        uint256 term = 1;
+        for (uint256 i = 1; i < 10; i++) {
+            term = term * uint256(x) / i;
+            sum = sum + term;
+        }
+        return sum;
     }
 }

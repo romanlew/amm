@@ -26,8 +26,7 @@ contract PriorityFeeAndPriceReturnVolatilitySimulator {
         }
     }
 
-    function calculateMean(
-        uint256[] memory data) internal view returns (uint256) {
+    function calculateMean(uint256[] memory data) internal view returns (uint256) {
         uint256 sum = 0;
         for (uint256 i = 0; i < data.length; i++) {
             sum += data[i];

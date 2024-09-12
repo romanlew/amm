@@ -13,7 +13,6 @@ import {DammOracle} from "../src/DammOracle.sol";
 import {console} from "forge-std/console.sol";
 import {FeeQuantizer} from "../src/FeeQuantizer.sol";
 import {MevClassifier} from "../src/MevClassifier.sol";
-import {DammHookHelper} from "../src/DammHookHelper.sol";
 import {MathLibrary} from "../src/MathLibrary.sol";
 
 
@@ -27,19 +26,12 @@ contract DammHook is BaseHook {
     FeeQuantizer feeQuantizer;
     MevClassifier mevClassifier;
     DammOracle dammOracle;
-    DammHookHelper dammHookHelper;
 
-    // Keeping track of the moving average gas price
-    uint128 public movingAverageGasPrice;
-    // How many times has the moving average been updated?
-    // Needed as the denominator to update it the next time based on the moving average formula
-    uint104 public movingAverageGasPriceCount;
-
-	// Keeping track of informed traders
-	address[] public informedTraders;
-
-	// Amount of points someone gets for referring someone else
-    uint256 public constant POINTS_FOR_REFERRAL = 500 * 10 ** 18;
+    uint256 public cutOffPercentile;
+    bool public firstTransaction;
+    uint256 public alpha;
+    uint256 public m;
+    uint256 public n;
 
     // The default base fees we will charge
     uint24 public constant BASE_FEE = 3000; // 0.3%
@@ -73,7 +65,11 @@ contract DammHook is BaseHook {
         feeQuantizer = new FeeQuantizer();
         mevClassifier = new MevClassifier(address(feeQuantizer), 5, 1, 2);
         dammOracle = new DammOracle();
-        dammHookHelper = new DammHookHelper(address(dammOracle));
+        cutOffPercentile = 85;
+        firstTransaction = true;
+        alpha = 50;
+        m = 10;
+        n = 5;
     }
 
 	// Set up hook permissions to return `true`
@@ -113,6 +109,22 @@ contract DammHook is BaseHook {
         // the `SwapFeeLibrary` for `uint24`
         if (!key.fee.isDynamicFee()) revert MustUseDynamicFee();
         return this.beforeInitialize.selector;
+    }
+
+    function calculateCombinedFee(uint256 blockId, address swapperId) internal view returns (uint256) {
+        uint256 combinedFee = alpha * endogenousDynamicFee(blockId) + (100 - alpha) * exogenousDynamicFee(swapperId) / 100;
+        combinedFee = combinedFee > endogenousDynamicFee(blockId) ? combinedFee : endogenousDynamicFee(blockId);
+        if (combinedFee <= BASE_FEE * 125 / 100) {
+            cutOffPercentile = cutOffPercentile + 5 > 100 ? 100 : cutOffPercentile + 5;
+        }
+        if (combinedFee > BASE_FEE * 2) {
+            cutOffPercentile = cutOffPercentile - 5 < 50 ? 50 : cutOffPercentile - 5;
+        }
+        if (firstTransaction) {
+            combinedFee *= 5;
+            firstTransaction = false;
+        }
+        return combinedFee;
     }
 
     // TODO external override onlyByPoolManager
@@ -158,13 +170,13 @@ contract DammHook is BaseHook {
                 // Adjust the fee based on order book pressure
                 // ToDo: USE BUY OR SEll 
                 if (orderBookPressure > 0 && !params.zeroForOne) {
-                    INTERIM_FEE = BASE_FEE + uint24(dammHookHelper.calculateCombinedFee(blockNumber, sender_address));
+                    INTERIM_FEE = BASE_FEE + uint24(calculateCombinedFee(blockNumber, sender_address));
                 } else if (orderBookPressure < 0 && !params.zeroForOne) {
-                    INTERIM_FEE = BASE_FEE - uint24(dammHookHelper.calculateCombinedFee(blockNumber, sender_address));                
+                    INTERIM_FEE = BASE_FEE - uint24(calculateCombinedFee(blockNumber, sender_address));                
                 } else if (orderBookPressure > 0 && params.zeroForOne) {
-                    INTERIM_FEE = BASE_FEE - uint24(dammHookHelper.calculateCombinedFee(blockNumber, sender_address));                
+                    INTERIM_FEE = BASE_FEE - uint24(calculateCombinedFee(blockNumber, sender_address));                
                 } else if (orderBookPressure < 0 && params.zeroForOne) {
-                    INTERIM_FEE = BASE_FEE + uint24(dammHookHelper.calculateCombinedFee(blockNumber, sender_address));                
+                    INTERIM_FEE = BASE_FEE + uint24(calculateCombinedFee(blockNumber, sender_address));                
                 }
 
                 // Update the dynamic LP fee
@@ -210,6 +222,48 @@ contract DammHook is BaseHook {
         }
     }
 
+    function endogenousDynamicFee(uint256 blockId) internal view returns (uint256) {
+        if (blockId == 0) {
+            return BASE_FEE;
+        }
+        (uint256 priceBeforePreviousBlock, uint256 priceAfterPreviousBlock) = dammOracle.getPrices(blockId);
+        uint256 priceImpact = (priceAfterPreviousBlock > priceBeforePreviousBlock) ?
+            (priceAfterPreviousBlock - priceBeforePreviousBlock) * 1e18 / priceBeforePreviousBlock :
+            (priceBeforePreviousBlock - priceAfterPreviousBlock) * 1e18 / priceBeforePreviousBlock;
+        uint256 dynamicFee = BASE_FEE + priceImpact * 1 / 100; // 1% of price impact
+        return dynamicFee;
+    }
+
+    function exogenousDynamicFee(address swapperId) internal view returns (uint256) {
+        if (submittedDeltaFees.length < 2) {
+            return BASE_FEE;
+        }
+        uint256[] memory sortedFees = submittedDeltaFees;
+        // Sort the fees
+        for (uint i = 0; i < sortedFees.length; i++) {
+            for (uint j = i + 1; j < sortedFees.length; j++) {
+                if (sortedFees[i] > sortedFees[j]) {
+                    uint256 temp = sortedFees[i];
+                    sortedFees[i] = sortedFees[j];
+                    sortedFees[j] = temp;
+                }
+            }
+        }
+        uint256 cutoffIndex = sortedFees.length * cutOffPercentile / 100;
+        uint256 sum = 0;
+        for (uint i = 0; i < cutoffIndex; i++) {
+            sum += sortedFees[i];
+        }
+        uint256 meanFee = sum / cutoffIndex;
+        uint256 sigmaFee = 0;
+        for (uint i = 0; i < cutoffIndex; i++) {
+            sigmaFee += (sortedFees[i] - meanFee) ** 2;
+        }
+        sigmaFee = sqrt(sigmaFee / cutoffIndex);
+        uint256 dynamicFee = previousBlockSwappers[swapperId] ? meanFee + m * sigmaFee : n * sigmaFee;
+        return dynamicFee;
+    }
+
     function afterSwap(
         address,
         PoolKey calldata,
@@ -250,8 +304,7 @@ contract DammHook is BaseHook {
         uint256[] memory filteredFees = new uint256[](cutoffIndex);
         for (uint256 i = 0; i < cutoffIndex; i++) {
             filteredFees[i] = sortedDeltaFees[i];
-        }
-        
+        }        
         uint256 sigmaFee = calculateStdDev(filteredFees, calculateMean(filteredFees));
         uint256 calculatedDeltaFeeForBlock = N * sigmaFee;
 

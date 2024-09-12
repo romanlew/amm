@@ -25,17 +25,15 @@ contract DammOracle {
         return OFF_CHAIN_MID_PRICE_ETH_USDT;
     }
 
-    /*
-    function sqrt(uint x) returns (uint y) {
-        uint z = (x + 1) / 2;
-        y = x;
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
         while (z < y) {
             y = z;
             z = (x / z + z) / 2;
         }
         return y;
     }
-    */
 
     /**
      * Returns the simulated orderbookpressure
@@ -74,5 +72,18 @@ contract DammOracle {
 
     function random(uint256 min, uint256 max) internal view returns (uint256) {
         return uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao))) % (max - min + 1) + min;
+    }
+
+    function getPrices(uint256 blockId) external view returns (uint256 priceBeforePreviousBlock, 
+                                                               uint256 priceAfterPreviousBlock) {
+        // Simulate fetching two consecutive prices from Gbm
+        // uint256 priceVolatility = getPriceVolatility(); 
+        uint256 priceVolatility = 0.1 / sqrt(86400/13);
+        uint256 basePrice = 1000; // Example base price
+        // Simulate price before the previous block
+        priceBeforePreviousBlock = basePrice + random(0, priceVolatility);
+        // Simulate price after the previous block
+        priceAfterPreviousBlock = basePrice + random(0, priceVolatility);
+        return (priceBeforePreviousBlock, priceAfterPreviousBlock);
     }
 }
