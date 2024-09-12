@@ -14,6 +14,7 @@ import {console} from "forge-std/console.sol";
 import {FeeQuantizer} from "../src/FeeQuantizer.sol";
 import {MevClassifier} from "../src/MevClassifier.sol";
 import {DammHookHelper} from "../src/DammHookHelper.sol";
+import {RandomNumberGenerator} from "../src/RandomNumberGenerator.sol";
 
 
 contract DammHook is BaseHook {
@@ -22,6 +23,7 @@ contract DammHook is BaseHook {
 	// data types 
     using BalanceDeltaLibrary for BalanceDelta;
     using LPFeeLibrary for uint24;
+    RandomNumberGenerator private randomNumberGenerator;
 
     FeeQuantizer feeQuantizer;
     MevClassifier mevClassifier;
@@ -241,10 +243,10 @@ contract DammHook is BaseHook {
             return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, finalPoolFee);
     }
 
-    function getPriorityFee(IPoolManager.SwapParams calldata params) internal pure returns (uint256) {
-        // Implement logic to retrieve priorityFee from params
-        // Placeholder implementation, replace with actual logic
-        return 0;
+    function getPriorityFee(IPoolManager.SwapParams calldata params) public returns (uint256) {
+        // currently returns the priority fee as a random number
+        uint256 randomNumber = randomNumberGenerator.getRandomNumber();
+        return randomNumber;
     }
 
     function _storeSubmittedDeltaFee(
